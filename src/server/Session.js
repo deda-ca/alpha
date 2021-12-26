@@ -66,7 +66,10 @@ class Session
 
     queue(updates)
     {
-        const data = (updates ? {'type': 'update', updates: (Array.isArray(updates) ? updates : [updates]) } : this.serialize());
+        let data = updates;
+
+        if (!updates) data = this.serialize();
+        else if (updates.type !== 'session') data = {'type': 'update', updates: (Array.isArray(updates) ? updates : [updates]) };
 
         // push the data onto the queue.
         this.pulseQueue.push( data );

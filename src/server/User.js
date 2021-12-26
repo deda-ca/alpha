@@ -20,6 +20,7 @@ class User
         this.session = null;
 
         this.info = {
+            id: this.id,
             name: 'Unnamed'
         };
     }
@@ -53,10 +54,19 @@ class User
         // Based on the event given from the client perform an action.
         switch (event.name)
         {
+        case 'join': 
+            updates = this.session.serialize();
+            updates.info = this.info;
+
+            // Also send the list of available characters only to the new user.
+            const response = { type: 'characters', characters: Array.from( this.engine.characters.entries() ) };
+            this.send( JSON.stringify(response) );
+
+            break;
         // If key press then pass the event to the character of this connection.
         case 'keydown': updates = this.character.onKeyPress(event); break;
         case 'keyup': updates = this.character.onKeyRelease(event); break;
-        case 'join': this.session.queue(); break;
+        case 'setCharacter': updates = this.character.setCharacter(event); break;
         }
 
         // if there are changes then queue them.

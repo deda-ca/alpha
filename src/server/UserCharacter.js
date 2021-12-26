@@ -28,6 +28,23 @@ class UserCharacter
         this.walkTimer = null;
     }
 
+    setCharacter(event)
+    {
+        if (event.characterName === this.state.name) return null;
+
+        // Get the character with the given name.
+        const character = this.engine.characters.get(event.characterName);
+        if (character)
+        {
+            this.character = character;
+            this.state.name = character.name;
+            this.state.assets =character.info.assets;
+            this.user.session.queue();
+        }
+
+        return null;
+    }
+
     /**
      * Invoked by the user when a key is pressed.
      * @param {*} event 

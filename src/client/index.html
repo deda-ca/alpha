@@ -1,14 +1,28 @@
 <html>
-
-    <body>
-        <canvas id="canvas" width="512px" height="512px" style="border: 1px solid black"></canvas>
-        
-
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
         <script src="Utility.js"></script>
         <script src="Connection.js"></script>
         <script src="Character.js"></script>
         <script src="User.js"></script>
         <script src="Engine.js"></script>
+
+    </head>
+
+    <body>
+        <canvas id="canvas" width="512px" height="512px" style="border: 1px solid black"></canvas>
+
+        <div id="characters">
+            
+            name: <span>{{ (this.session.user ? this.session.user.info.name : 'Unknown') }}</span>
+
+
+            <h2>Characters</h2>
+            <div v-for="character in this.characters">
+                <a href="javascript:" @click="self.setCharacter(character.name)">{{ character.name }}</a>
+            </div>
+
+        </div>
 
         <script>
 

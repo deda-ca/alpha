@@ -5,6 +5,8 @@ class Engine
 
     constructor(options)
     {
+        this.self = this;
+
         this.options = options;
 
         this.connection = new Connection(this);
@@ -13,6 +15,10 @@ class Engine
         this.context = canvas.getContext('2d');
 
         this.keyState = {};
+
+        this.characters = [];
+
+        this.session = {};
         
         window.addEventListener( 'keydown', event=>{
 
@@ -38,6 +44,15 @@ class Engine
 
         setInterval( ()=>window.requestAnimationFrame(()=>this.draw()), 100 );
 
+
+        this.ui = new Vue({
+            el: '#characters',
+            data: this,
+            methods: {
+                alert: function(message){ console.log(message) }
+            }
+        });
+
     }
 
 
@@ -45,6 +60,11 @@ class Engine
     {
         // Request to join the server.
         this.connection.send({"name": "join"});
+    }
+
+    setCharacter(name)
+    {
+        this.connection.send({"name": "setCharacter", "characterName": name});
     }
 
     /**
@@ -62,7 +82,14 @@ class Engine
         if (event.type === 'session')
         {
             this.session = this.loadSession(event);
-    
+
+            this.session.user = this.session.users.find( user=>(user.id === this.session.info.id) );
+
+            console.log(this.session);
+        }
+        else if (event.type === 'characters')
+        {
+            this.characters = event.characters.map( character=>character[1].info );
         }
         else if (event.type === 'update')
         {
@@ -106,7 +133,7 @@ class Engine
     
                 asset.image.src = 'data:image/png;base64,' + base64;
                 asset.image.onload = (error)=>{
-                    console.log(error);
+                    //console.log(error);
                 };
     
                 assets[index] = asset;
