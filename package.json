@@ -1,0 +1,27 @@
+{
+  "name": "alpha",
+  "version": "1.0.0",
+  "description": "A community driven 2D online multiplayer PIXEL platformer game",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DEDAjs/alpha.git"
+  },
+  "keywords": [
+    "2D",
+    "platformer",
+    "game"
+  ],
+  "author": "Liam & Charbel Choueiri",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/DEDAjs/alpha/issues"
+  },
+  "homepage": "https://github.com/DEDAjs/alpha#readme",
+  "dependencies": {
+    "express": "^4.17.2"
+  }
+}
