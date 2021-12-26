@@ -22,6 +22,8 @@
   },
   "homepage": "https://github.com/DEDAjs/alpha#readme",
   "dependencies": {
-    "express": "^4.17.2"
+    "express": "^4.17.2",
+    "gif-frames": "^1.0.1",
+    "ws": "^8.4.0"
   }
 }

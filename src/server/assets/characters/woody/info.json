@@ -1,0 +1,12 @@
+{
+    "name": "Guy",
+    "size": {
+        "width": 64,
+        "height": 64
+    },
+    "assets":
+    {
+        "ideal": ["main.png"],
+        "walking": ["main.png"]
+    }
+}

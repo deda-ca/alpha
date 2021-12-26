@@ -1,0 +1,12 @@
+{
+    "name": "Blorbo",
+    "size": {
+        "width": 64,
+        "height": 64
+    },
+    "assets":
+    {
+        "ideal": "blorbo_idle.gif",
+        "walking": "blorbo_walk.gif"
+    }
+}

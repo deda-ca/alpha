@@ -1,12 +1,19 @@
 
-const express = require('express')
-const path = require('path')
+const path = require('path');
 
-const app = express()
-const port = 3000
+const Engine = require('./Engine.js');
 
+// Setup the options;
+const options = {
+    port: 3000,
+    publicPath: path.join(__dirname, '../client'),
+    defaultCharacter: "blorbo"
+};
 
-app.use(express.static(path.join(__dirname, '../client')));
+try {
+    // Create the game engine.
+    const engine = new Engine(options);
 
-
-app.listen(port, () =>console.log(`listening at http://localhost:${port}`) );
+} catch (error) {
+    console.error(error);
+}
