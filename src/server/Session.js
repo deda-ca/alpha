@@ -6,6 +6,12 @@ class Session
         this.engine = engine;
 
         this.users = new Set();
+
+        this.pulseQueue = [];
+
+        this.pulseTimer = setInterval( ()=>this.pulse(), 100 );
+
+        
     }
 
     /**
@@ -58,13 +64,26 @@ class Session
     }
 
 
-    queue(update)
+    queue(updates)
     {
-        const data = (update ? {'type': 'update', updates: [update]} : this.serialize());
+        const data = (updates ? {'type': 'update', updates: (Array.isArray(updates) ? updates : [updates]) } : this.serialize());
 
-        const json = JSON.stringify(data);
+        // push the data onto the queue.
+        this.pulseQueue.push( data );
 
         console.log(data);
+    }
+
+
+
+    pulse()
+    {
+        if (this.pulseQueue.length === 0) return;
+
+        // If there is something in the queue then dequeue it and send it to all the users.
+        const json = JSON.stringify(this.pulseQueue);
+
+        this.pulseQueue.splice(0, this.pulseQueue.length);
 
         // Send the data to the user session users.
         for (let user of this.users) user.send(json);

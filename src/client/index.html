@@ -4,8 +4,23 @@
         <canvas id="canvas" width="512px" height="512px" style="border: 1px solid black"></canvas>
         
 
+        <script src="Utility.js"></script>
         <script src="Connection.js"></script>
-        <script src="dev/Character.js"></script>
+        <script src="Character.js"></script>
+        <script src="User.js"></script>
+        <script src="Engine.js"></script>
+
+        <script>
+
+            const options = {
+                host: `ws://${window.location.host}`,
+                protocol: 'alpha-protocol-v1'
+            };
+
+            window.engine = new Engine(options);
+
+        </script>
+        
         
     </body>
 </html>

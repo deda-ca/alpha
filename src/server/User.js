@@ -48,28 +48,20 @@ class User
     {
         console.log(event);
 
+        let updates = null;
+
         // Based on the event given from the client perform an action.
         switch (event.name)
         {
         // If key press then pass the event to the character of this connection.
-        case 'keydown': this.onKeyPress(event); break;
+        case 'keydown': updates = this.character.onKeyPress(event); break;
+        case 'keyup': updates = this.character.onKeyRelease(event); break;
         case 'join': this.session.queue(); break;
         }
-    }
-
-    /**
-     * 
-     * @param {*} event 
-     */
-    onKeyPress(event)
-    {
-        // If the user is within a session then pass the event to the character.
-        const updates = this.character.onKeyPress(event);
 
         // if there are changes then queue them.
         if (updates) this.session.queue( updates );
     }
-
 
     serialize()
     {

@@ -1,35 +1,52 @@
 
-const url = `ws://${window.location.host}`;
-const protocols = 'alpha-protocol-v1';
 
-const webSocket = new WebSocket(url, protocols);
+class Connection
+{
+    constructor(engine)
+    {
+        this.engine = engine;
 
-window.webSocket = webSocket;
+        this.socket = null;
 
-webSocket.onopen = ()=> {
+        this.connect();
 
-    webSocket.send(JSON.stringify({"name": "join"}));
-
-};
-
-webSocket.onmessage = (evt)=>{
-
-    try {
-
-        //console.log(evt.data);
-
-        const event = JSON.parse(evt.data);
-
-        // Update the existing tree with the given data.
-
-        updateSession(event);
-
-    } catch (error) {
-        console.log(error);
+        // @todo if closed then try to reconnect with interval.
     }
-};
 
+    connect()
+    {
+        if (this.socket)
+        {
+            this.socket.close();
+            this.socket = null;
+        }
 
+        this.socket = new WebSocket(this.engine.options.host, this.engine.options.protocols);
+
+        this.socket.onopen = ()=>this.engine.onConnected();
+        this.socket.onmessage = (evt)=>this.onMessage(evt);
+        this.socket.onclose = ()=>this.connect();
+    }
+
+    onMessage(evt)
+    {
+        try {
+            const event = JSON.parse(evt.data);
+
+            // Update the existing tree with the given data.
+            this.engine.onMessage(event);
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    send(message)
+    {
+        this.socket.send(JSON.stringify(message));
+    }
+   
+}
 
 
 

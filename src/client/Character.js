@@ -1,0 +1,8 @@
+
+class Character
+{
+    constructor()
+    {
+        
+    }
+}

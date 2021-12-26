@@ -54,7 +54,7 @@ class WSServer
                 user.onEvent(event);
 
             } catch (error) {
-                console.error(error);
+                console.error(error.stack);
             }
 
         });
