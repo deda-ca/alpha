@@ -2,20 +2,25 @@
 const { WebSocketServer } = require('ws');
 
 /**
-  * @class
+ * A web-socket server that listens to new connections and creates users to add to the sessions.
+ * 
+ * @class
+ * @memberof DEDA.AllGames.Core
+ * @author Charbel Choueiri <charbel.choueiri@gmail.com>
  */
 class WSServer
 {
     /**
-     * 
-     * @param {*} engine 
+     * Creates a new Web-Socket Server.
+     * @param {DEDA.AllGames.Core.Engine} engine - Reference to the game engine.
      */
     constructor(engine)
     {
         /**
-         * This is the global server game engine.
+         * Reference to the game engine.
+         * @member {DEDA.AllGames.Core.Engine}
          */
-        this.engine = engine;
+         this.engine = engine;
 
         /**
          * The web-socket server used to listen to in-coming connections.
@@ -34,30 +39,34 @@ class WSServer
      */
     onConnection(webSocket)
     {
-        // Create a user for this connection and pass it the web socket and engine.
-        const user = this.engine.createUser(webSocket);
+        try {
+            // Create a user for this connection and pass it the web socket and engine.
+            const user = this.engine.createUser(webSocket);
 
-        // Attach events to the new web-socket. This is invoked when the connection is closed. Clean up after.
-        webSocket.on('close', ()=>{
-            // Remove the character from the character map.
-            this.engine.removeUser(user);
-        });
+            // Attach events to the new web-socket. This is invoked when the connection is closed. Clean up after.
+            webSocket.on('close', ()=>{
+                // Remove the character from the character map.
+                this.engine.removeUser(user);
+            });
 
-        // Attach to the message event to receive messages form the client.
-        webSocket.on('message', message=>{
+            // Attach to the message event to receive messages form the client.
+            webSocket.on('message', message=>{
 
-            try {
-                //Parse the message form the user.
-                const event = JSON.parse(message);
+                try {
+                    //Parse the message form the user.
+                    const event = JSON.parse(message);
 
-                // Pass the message to the user object to handle.
-                user.onEvent(event);
+                    // Pass the message to the user object to handle.
+                    user.onEvent(event);
 
-            } catch (error) {
-                console.error(error.stack);
-            }
+                } catch (error) {
+                    console.error(error);
+                }
 
-        });
+            });
+        } catch (error) {
+            console.error(error);
+        }
     }
 }
 

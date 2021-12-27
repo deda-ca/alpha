@@ -1,8 +1,16 @@
-
-
+/**
+ * The game engine to renders the current state of the server.
+ * 
+ * @class
+ * @memberof DEDA.AllGames.Client
+ * @author Charbel Choueiri <charbel.choueiri@gmail.com>
+ */
 class Engine
 {
-
+    /**
+     * Creates a new game engine.
+     * @param {*} options 
+     */
     constructor(options)
     {
         this.self = this;
@@ -12,6 +20,7 @@ class Engine
         this.connection = new Connection(this);
 
         this.canvas = document.getElementById('canvas');
+
         this.context = canvas.getContext('2d');
 
         this.keyState = {};
@@ -19,6 +28,8 @@ class Engine
         this.characters = [];
 
         this.session = {};
+
+        this.userId = null;
         
         window.addEventListener( 'keydown', event=>{
 
@@ -27,151 +38,184 @@ class Engine
             // If the key is already down then do nothing.
             if (this.keyState[keyCode]) return;
 
-            const action = {name: 'keydown', keyCode: keyCode };
-            this.connection.send(action);
-
+            // Update the key state.
             this.keyState[keyCode] = true;
+
+            // Map the keycode to the action and send it to the server.
+            this.connection.send({type: 'keydown', action: this.mapKeyCode(keyCode) });
         });
 
         window.addEventListener( 'keyup', event=>{
 
             const keyCode = event.keyCode;
 
+            // Update the key state.
             this.keyState[keyCode] = false;
-            const action = {name: 'keyup', keyCode: keyCode };
-            this.connection.send(action);
+
+            // Map the keycode to the action and send it to the server.
+            this.connection.send({type: 'keyup', action: this.mapKeyCode(keyCode) });
         });
 
-        setInterval( ()=>window.requestAnimationFrame(()=>this.draw()), 100 );
+        // Start the render loop
+        setInterval( ()=>window.requestAnimationFrame(()=>this.render()), this.options.renderInterval );
 
-
-        this.ui = new Vue({
-            el: '#characters',
-            data: this,
-            methods: {
-                alert: function(message){ console.log(message) }
-            }
-        });
-
+        // The UI of the application
+        this.ui = new Vue({ el: '#characters', data: this });
     }
 
 
     onConnected()
     {
         // Request to join the server.
-        this.connection.send({"name": "join"});
+        this.connection.send({"type": "join"});
     }
 
     setCharacter(name)
     {
-        this.connection.send({"name": "setCharacter", "characterName": name});
+        this.connection.send({"type": "setCharacter", "name": name});
     }
 
     /**
      * 
      * @param {*} event 
      */
-    onMessage(event)
+    async onMessage(event)
     {
-        if (Array.isArray(event))
-        {
-            for (let evt of event) this.onMessage(evt);
-            return;
-        }
+        // If the actions is an array then loop though them.
+        if (Array.isArray(event)) { for (let evt of event) this.onMessage(evt); return; }
 
+        // Updates the current session user list and session maps and details.
         if (event.type === 'session')
         {
+            // Populate the session with the character details.
             this.session = this.loadSession(event);
 
-            this.session.user = this.session.users.find( user=>(user.id === this.session.info.id) );
-
-            console.log(this.session);
+            // Find the user state within the session.
+            this.session.user = this.session.users.find( user=>(user.id === this.userId) );
+        }
+        else if (event.type === 'user')
+        {
+            // Get the user ID and set it locally, this is used to fetch the user details from the sesson later.
+            this.userId = event.id;
         }
         else if (event.type === 'characters')
         {
-            this.characters = event.characters.map( character=>character[1].info );
+            // Traverse the characters and load their images.
+            for (let character of event.characters)
+                await this.loadCharacter(character);
+
+            // Set the characters locally.
+            this.characters = event.characters;
         }
-        else if (event.type === 'update')
+        else if (event.type === 'update') this.onUpdate(event);
+    }
+
+    onUpdate(event)
+    {
+        // Traverse the updates and apply them if it is an array.
+        if (Array.isArray(event)) { for (let evt of event) this.onUpdate(evt); return; }
+
+        // Get the object with id.
+        const object = this.session.users.find( user=>(user.id === event.id) );
+        if (object)
         {
-            // Traverse the updates and apply them.
-            for (let update of event.updates)
+            // Traverse the properties and update them.
+            for (let key in event.properties)
             {
-                // Get the object with id.
-                const object = this.session.users.find( user=>(user.id === update.id) );
-                if (object) Utility.setProperty(object, update.key, update.value);
+                const value = event.properties[key]
+                Utility.setProperty(object, key, value);
             }
-        }
+        } 
     }
 
 
-
+    /**
+     * Loads the character details within the users.
+     */
     loadSession(session)
     {
-        // Convert the character base64 assets to images.
+        // Traverse the users and find their corresponding character definitions.
         for (let user of session.users)
-        {
-            this.loadCharacter(user.character);
-        }
+            user.characterDefinition = this.characters.find( character=>(character.name === user.state.name) );
 
+        // Return the populated session.
         return session;
     }
 
-    loadCharacter(character)
+    /**
+     * Traverses the given character assets and converts the base64 data url to an image 
+     * so we can speed up rendering.
+     */
+    async loadCharacter(character)
     {
-        for (let name in character.assets)
+        for (let name in character.states)
         {
-            let assets = character.assets[name];
-            assets.frameIndex = 0;
-    
+            // Get the next state.
+            let state = character.states[name];
+
             // Traverse the base64 and convert to images.
-            for (let index = 0; index < assets.length; index++)
+            for (let index = 0; index < state.assets.length; index++)
             {
-                const base64 = assets[index];
-                const asset = {
-                    image: new Image()
-                };
-    
-                asset.image.src = 'data:image/png;base64,' + base64;
-                asset.image.onload = (error)=>{
-                    //console.log(error);
-                };
-    
-                assets[index] = asset;
+                // Create the image and set the src using the data url. Replace the base64 with the image.
+                state.assets[index] = await this.loadImage(state.assets[index]);
             }
             
         }
     }
 
-
-
-    draw()
+    loadImage(dataURL)
     {
+        return new Promise( resolve=>{
+            const image = new Image()
+            image.src = dataURL;
+            image.onload = ()=>{
+                resolve(image);
+            };
+
+        });
+    }
+
+    /**
+     * Maps the given keyCode to an action based on the user preferences and options.
+     */
+    mapKeyCode(keyCode)
+    {
+        return this.options.keyboardMap[keyCode];
+    }
+
+
+    /**
+     * Refreshes the render of the canvas to the current state.
+     */
+    render()
+    {
+        // Clear the canvas.
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
-        // Render the characters.
-        if (this.session && this.session.users)
+
+        // If there is no session then don't render anything.
+        if (!this.session || !this.session.users) return;
+
+        // Render the users in the session.
+        for (let user of this.session.users)
         {
-            for (let user of this.session.users)
-            {
-                const character = user.character;
+            // Get the character definition where the assets are stored.
+            const character = user.characterDefinition;
 
-                // Get the current character state image
-                const asset = character.assets[character.state];
+            // If there is no character definition then skip it.
+            if (!character) continue;
 
-//console.log(character.state);
+            // Get the current character state image
+            const state = character.states[user.state.state];
 
-                // Move to the next frame.
-                asset.frameIndex++;
-                if (asset.frameIndex >= asset.length) asset.frameIndex = 0;
+            // If we are past the last frame then reset the motion index.
+            //if (user.state.motionIndex >= (state.assets.length - 1)) user.state.motionIndex = 0;
 
-                // Get the next frame
-                const frame = asset[asset.frameIndex];
-    
-                // Render it.
-                this.context.drawImage(frame.image, character.position.x, character.position.y, 64, 64);
-            }
+            // Get the next frame and move to the next one.
+            const image = state.assets[user.state.motionIndex++ % state.assets.length];
+
+            // Render it.
+            this.context.drawImage(image, user.state.position.x, user.state.position.y, character.size.width, character.size.height);
         }
-
     }
 
 }
