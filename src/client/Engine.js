@@ -180,6 +180,7 @@ class Engine
      */
     mapKeyCode(keyCode)
     {
+console.log(keyCode);
         return this.options.keyboardMap[keyCode];
     }
 
