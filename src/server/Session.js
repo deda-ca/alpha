@@ -112,7 +112,7 @@ class Session
         // If the actions is an array then add each item to the queue. Otherwise push the single action to the array.
         if (Array.isArray(actions)) this.tickQueue.push(  ...actions ); else this.tickQueue.push(actions);
 
-        console.log('<- ', actions);
+// console.log('<- ', actions);
     }
 
     /**

@@ -72,7 +72,7 @@ class User
      */
     onEvent(event)
     {
-console.log("-> ", event);
+//console.log("-> ", event);
 
         // Based on the event given from the client perform an action.
         switch (event.type)

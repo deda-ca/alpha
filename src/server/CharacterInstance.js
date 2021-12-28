@@ -3,6 +3,13 @@
  * The User Character class represents a character within the game, This can be a user or an NPC.
  * This is used to store the current user character state, position, health, and all active properties, items, buffs, etc.
  * 
+ * @todo: 
+ *   - jumping should only affect Y while the current left & right will affect X.
+ *   - Allow acceleration and declaration motion options.
+ *   - Allow assets for acceleration and declaration as well.
+ *   - Replace the idle() state function with a state stack.
+ *   - Allow multiple states at the same time! maybe!
+ * 
  * @class
  * @memberof DEDA.AllGames.Core
  * @author Charbel Choueiri <charbel.choueiri@gmail.com>
@@ -62,6 +69,11 @@ class CharacterInstance
         };
 
         /**
+         * Points to the currently active state of the character.
+         */
+        this.stateDefinition = null;
+
+        /**
          * A motion ticker/timer for this character. This is active if the character is in a state that contains motion.
          * @member {Timer}
          */
@@ -104,11 +116,11 @@ class CharacterInstance
         // Update the character based on the action then add a list of changes to the queue.
         switch(event.action)
         {
-        case 'up'   : this.state.keyPresses.up    = true; this.walk(0, -1); break;
-        case 'down' : this.state.keyPresses.down  = true; this.walk(0, +1); break;
-        case 'left' : this.state.keyPresses.left  = true; this.walk(-1, 0); break;
-        case 'right': this.state.keyPresses.right = true; this.walk(+1, 0); break;
-        case 'jump' : this.state.keyPresses.jump  = true; this.jump(); break;
+        case 'up'   : this.state.keyPresses.up    = true; this.state_start(0, -1); break;
+        case 'down' : this.state.keyPresses.down  = true; this.state_start(0, +1); break;
+        case 'left' : this.state.keyPresses.left  = true; this.state_start(-1, 0); break;
+        case 'right': this.state.keyPresses.right = true; this.state_start(+1, 0); break;
+        case 'jump' : this.state.keyPresses.jump  = true; this.state_start(this.state.direction.x, -1, 'jumping'); break; //this.jump(); break;
         }
     }
 
@@ -140,20 +152,23 @@ class CharacterInstance
     idle()
     {
         // If currently jumping then complete the jump first.
-        if (this.state.state === 'jumping') return;
+        if (this.stateDefinition && this.stateDefinition.fixed) return;
 
         // If there is a motion timer then clear it.
         if (this.motionTimer) clearInterval(this.motionTimer);
 
+        // Update the currents tate definition.
+        this.stateDefinition = this.character.definition.states['idle'];
+
         // Check which key is pressed and act accordingly before going to idle.
-        if (this.state.direction.x === -1 && this.state.keyPresses.left) return this.walk(-1), 0; 
-        else if (this.state.direction.x === +1 && this.state.keyPresses.right) return this.walk(+1, 0);
-        else if (this.state.direction.y === -1 && this.state.keyPresses.up) return this.walk(0, -1);
-        else if (this.state.direction.y === +1 && this.state.keyPresses.down) return this.walk(0, +1);
-        else if (this.state.keyPresses.left) return this.walk(-1, 0); 
-        else if (this.state.keyPresses.right) return this.walk(+1, 0);
-        else if (this.state.keyPresses.up) return this.walk(0, -1);
-        else if (this.state.keyPresses.down) return this.walk(0, +1);
+        if (this.state.direction.x === -1 && this.state.keyPresses.left) return this.state_start(-1), 0; 
+        else if (this.state.direction.x === +1 && this.state.keyPresses.right) return this.state_start(+1, 0);
+        else if (this.state.direction.y === -1 && this.state.keyPresses.up) return this.state_start(0, -1);
+        else if (this.state.direction.y === +1 && this.state.keyPresses.down) return this.state_start(0, +1);
+        else if (this.state.keyPresses.left) return this.state_start(-1, 0); 
+        else if (this.state.keyPresses.right) return this.state_start(+1, 0);
+        else if (this.state.keyPresses.up) return this.state_start(0, -1);
+        else if (this.state.keyPresses.down) return this.state_start(0, +1);
 
         // Set the state to idle and clear any motions and reset the motion index.
         this.state.state = 'idle';
@@ -170,17 +185,19 @@ class CharacterInstance
      * @param {integer} xDirection - +1 for left and -1 for right, 0 to not move in this direction.
      * @param {integer} yDirection - +1 for up and -1 for down, 0 to not move in this direction.
      */
-    walk(xDirection = 0, yDirection = 0)
+    state_start(xDirection = 0, yDirection = 0, state = 'walking')
     {
-        // If currently jumping then complete the jump first.
-        if (this.state.state === 'jumping') return;
+        // If the active state is fixed then can not start until it is done.
+        if (this.stateDefinition && this.stateDefinition.fixed) return;
 
         // If there is a motion timer then clear it.
         if (this.motionTimer) clearInterval(this.motionTimer);
 
+        // Get the state definition form the character
+        this.stateDefinition = this.character.definition.states[state];
+
         // Set the state to idle and clear any motions and reset the motion index. Update the X and Y directions as well.
-        this.state.state = 'walking';
-        this.state.motion = this.character.definition.states.walking.motion;
+        this.state.state = state;
         this.state.motionIndex = 0;
         this.state.direction.x = xDirection;
         this.state.direction.y = yDirection;
@@ -189,78 +206,35 @@ class CharacterInstance
         this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': xDirection, 'state.direction.y': yDirection} });
 
         // Invoke the first walk to get started immediately
-        this.walk_tick();
+        this.state_tick();
 
         // Set the jump_next within the pulse/ticker.
-        this.motionTimer = setInterval( ()=>this.walk_tick(), this.engine.options.tickInterval);
+        this.motionTimer = setInterval( ()=>this.state_tick(), this.engine.options.tickInterval);
     }
 
     /**
      * Invoked by the ticker to move the jumping state to the next position.
      */
-    walk_tick()
+    state_tick()
     {
         // If there is no motion then do nothing.
-        if (!this.state.motion) return;
+        if (!this.stateDefinition.motion) return;
 
-        // Update the motion index and get the motion delta for it.
-        const motionDelta = this.state.motion[ this.state.motionIndex++ % this.state.motion.length ];
-        if (!motionDelta) return;
-
-        // Update the position.
-        this.state.position.y += (this.state.direction.y * motionDelta.y);
-        this.state.position.x += (this.state.direction.x * motionDelta.x);
-
-        // Trigger a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.motionIndex': this.state.motionIndex, 'state.position.x': this.state.position.x, 'state.position.y': this.state.position.y} });
-    }
-
-    /**
-     * Invoked when the user clicks on the jump button.
-     */
-    jump()
-    {
-        // If the character is already jumping then do nothing unless they have a double/triple jump ability.
-        // @todo: add multi-jumps in future releases.
-        if (this.state.state === 'jumping') return;
-
-        // If there is a motion timer then clear it.
-        if (this.motionTimer) clearInterval(this.motionTimer);
-
-        // Update the state and set the jumping motion.
-        this.state.state = 'jumping';
-        this.state.motion = this.character.definition.states['jumping'].motion;
-        this.state.motionIndex = 0;
-
-        // Add a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex} });
-
-        // Invoke the jump process.
-        this.jump_tick();
-
-        // Set the jump_next within the pulse/ticker.
-        this.motionTimer = setInterval( ()=>this.jump_tick(), this.engine.options.tickInterval);
-    }
-
-    /**
-     * Invoked by the ticker to move the jumping state to the next position.
-     */
-    jump_tick()
-    {
         // If reached the end of the jump then move to the idle state.
-        if (this.state.motionIndex >= this.state.motion.length)
+        if (this.stateDefinition.type === 'single' && this.state.motionIndex >= this.stateDefinition.motion.length)
         {
             // Clear the jump state first.
             this.state.state = 'idle';
+            this.stateDefinition = this.character.definition.states['idle'];
             return this.idle();
         }
 
         // Update the motion index and get the motion delta for it.
-        const motionDelta = this.state.motion[ this.state.motionIndex++ % this.state.motion.length ];
+        const motionDelta = this.stateDefinition.motion[ this.state.motionIndex++ % this.stateDefinition.motion.length ];
         if (!motionDelta) return;
 
         // Update the position.
-        this.state.position.y += (-1 * motionDelta.y);
+        this.state.position.y += (this.state.direction.y * motionDelta.y);
         this.state.position.x += (this.state.direction.x * motionDelta.x);
 
         // Trigger a state update to the session.

@@ -13,6 +13,8 @@
             "assets": "walking.gif"
         },
         "jumping": {
+            "type": "single",
+            "fixed": true,
             "motion": [{"x": 5, "y": 15}, {"x": 5, "y": 15}, {"x": 5, "y": 5}, {"x": 5, "y": 0}, {"x": 5, "y": -5}, {"x": 5, "y": -15}, {"x": 5, "y": -15}],
             "assets": "jumping.gif"
         },
