@@ -48,7 +48,6 @@ class CharacterInstance
          * @property {string} name - The name of the character. This is also stored in the state so the client can load the assets for this character from the loaded characters.
          * @property {string} state - The current state of the character. 'idle', 'walking', etc.
          * @property {object} position - The current active position. The default value is defined within session map: {x, y}.
-         * @property {object} direction - Defines the direction vector the user is moving in: {x: +1, y: +1}.
          * @property {object} hitBox - Defines the current active hitBox. This is dependent on the current state. The default is used until overridden by the state: {x1, y1, x2, y2}.
          * @property {integer} motionIndex -Defines the current motion index of the state. The motion defines how the object is moving in the current direction.
          * @memberof DEDA.AllGames.Core.Character.State
@@ -61,23 +60,22 @@ class CharacterInstance
         this.state = {
             name: this.character.name,
             state: 'idle',
+            motionIndex: 0,
             position: { x: 100, y: 100 },
-            direction: {x: 0, y: -1},
-            keyPresses: { up: false, down: false, right: false, left: false, jump: false, crouch: false },
-            hitBox: this.character.definition.states.idle.hitBox || this.character.definition.hitBox,
-            motionIndex: 0
+            hitBox: this.character.definition.states.idle.hitBox || this.character.definition.hitBox
         };
 
         /**
-         * Points to the currently active state of the character.
+         * A list of currently active actions to apply to the character on every tick.
+         * @member {Map}
          */
-        this.stateDefinition = null;
+        this.actions = new Map();
 
         /**
          * A motion ticker/timer for this character. This is active if the character is in a state that contains motion.
          * @member {Timer}
          */
-        this.motionTimer = null;
+        this.actionTimer = null;
     }
 
     /**
@@ -107,21 +105,34 @@ class CharacterInstance
         this.broadcast({type: 'update', id: this.user.id, properties: {'state.name': this.state.name, 'state.motionIndex': this.state.motionIndex} });
     }
 
+
     /**
      * Invoked by the user when a key is pressed or the moves moved.
      * @param {*} event 
      */
     onKeyPress(event)
     {
+        let action = null;
+
         // Update the character based on the action then add a list of changes to the queue.
         switch(event.action)
         {
-        case 'up'   : this.state.keyPresses.up    = true; this.state_start(0, -1); break;
-        case 'down' : this.state.keyPresses.down  = true; this.state_start(0, +1); break;
-        case 'left' : this.state.keyPresses.left  = true; this.state_start(-1, 0); break;
-        case 'right': this.state.keyPresses.right = true; this.state_start(+1, 0); break;
-        case 'jump' : this.state.keyPresses.jump  = true; this.state_start(this.state.direction.x, -1, 'jumping'); break; //this.jump(); break;
+        case 'up'   : action = {name: 'up'   , type: 'walking', state: this.character.definition.states.walking, motionIndex: 0, direction: {x: 0, y:-1}}; break;
+        case 'down' : action = {name: 'down' , type: 'walking', state: this.character.definition.states.walking, motionIndex: 0, direction: {x: 0, y:+1}}; break;
+        case 'left' : action = {name: 'left' , type: 'walking', state: this.character.definition.states.walking, motionIndex: 0, direction: {x:-1, y: 0}}; break;
+        case 'right': action = {name: 'right', type: 'walking', state: this.character.definition.states.walking, motionIndex: 0, direction: {x:+1, y: 0}}; break;
+        case 'jump' : action = {name: 'jump' , type: 'jumping', state: this.character.definition.states.jumping, motionIndex: 0, direction: {x: 0, y:-1}}; break;
+        default: return;
         }
+
+        // Apply the initial action.
+        this.action_apply(action);
+
+        // Add the action onto the stack.
+        this.actions.set(action.name, action);
+
+        // If there isn't a timer then start one.
+        if (!this.actionTimer) this.actionTimer = setInterval( ()=>this.action_tick(), this.engine.options.tickInterval);
     }
 
     /**
@@ -130,115 +141,67 @@ class CharacterInstance
      */
     onKeyRelease(event)
     {
-        // If the character was moving in that direction then stop it.
-        switch(event.action)
-        {
-        // Do nothing for this one.
-        case 'jump':
-            this.state.keyPresses.jump = false;
-            break;
+        // Get the action from the stack. If it does not exist then do nothing.
+        const action = this.actions.get(event.action);
+        if (!action) return;
 
-        // if moving in any direction and released button then go to idle.
-        case 'up':    this.state.keyPresses.up = false; this.idle(); break;
-        case 'down':  this.state.keyPresses.down = false; this.idle(); break;
-        case 'left':  this.state.keyPresses.left = false; this.idle(); break;
-        case 'right': this.state.keyPresses.right = false; this.idle(); break;
-        }
+        // Otherwise if it is a fixed action then wait until it is done.
+        if (action.state.fixed) action.finished = true;
+        // Otherwise remove it from the stack.
+        else this.actions.delete(event.action);
     }
 
-    /**
-     * Sets the state of the character to idle.
-     */
-    idle()
+
+
+    action_tick()
     {
-        // If currently jumping then complete the jump first.
-        if (this.stateDefinition && this.stateDefinition.fixed) return;
+        let event = {type: 'update', id: this.user.id, properties: {}};
 
-        // If there is a motion timer then clear it.
-        if (this.motionTimer) clearInterval(this.motionTimer);
-
-        // Update the currents tate definition.
-        this.stateDefinition = this.character.definition.states['idle'];
-
-        // Check which key is pressed and act accordingly before going to idle.
-        if (this.state.direction.x === -1 && this.state.keyPresses.left) return this.state_start(-1), 0; 
-        else if (this.state.direction.x === +1 && this.state.keyPresses.right) return this.state_start(+1, 0);
-        else if (this.state.direction.y === -1 && this.state.keyPresses.up) return this.state_start(0, -1);
-        else if (this.state.direction.y === +1 && this.state.keyPresses.down) return this.state_start(0, +1);
-        else if (this.state.keyPresses.left) return this.state_start(-1, 0); 
-        else if (this.state.keyPresses.right) return this.state_start(+1, 0);
-        else if (this.state.keyPresses.up) return this.state_start(0, -1);
-        else if (this.state.keyPresses.down) return this.state_start(0, +1);
-
-        // Set the state to idle and clear any motions and reset the motion index.
-        this.state.state = 'idle';
-        this.state.motion = null;
-        this.state.motionIndex = 0;
-        this.state.direction.x = 0;
-        
-        // Add a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': this.state.direction.x} });
-    }
-
-    /**
-     * Invoked when the user clicks on the walk keys to walk either left or right based on the direction.
-     * @param {integer} xDirection - +1 for left and -1 for right, 0 to not move in this direction.
-     * @param {integer} yDirection - +1 for up and -1 for down, 0 to not move in this direction.
-     */
-    state_start(xDirection = 0, yDirection = 0, state = 'walking')
-    {
-        // If the active state is fixed then can not start until it is done.
-        if (this.stateDefinition && this.stateDefinition.fixed) return;
-
-        // If there is a motion timer then clear it.
-        if (this.motionTimer) clearInterval(this.motionTimer);
-
-        // Get the state definition form the character
-        this.stateDefinition = this.character.definition.states[state];
-
-        // Set the state to idle and clear any motions and reset the motion index. Update the X and Y directions as well.
-        this.state.state = state;
-        this.state.motionIndex = 0;
-        this.state.direction.x = xDirection;
-        this.state.direction.y = yDirection;
-
-        // Add a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': xDirection, 'state.direction.y': yDirection} });
-
-        // Invoke the first walk to get started immediately
-        this.state_tick();
-
-        // Set the jump_next within the pulse/ticker.
-        this.motionTimer = setInterval( ()=>this.state_tick(), this.engine.options.tickInterval);
-    }
-
-    /**
-     * Invoked by the ticker to move the jumping state to the next position.
-     */
-    state_tick()
-    {
         // If there is no motion then do nothing.
-        if (!this.stateDefinition.motion) return;
-
-        // If reached the end of the jump then move to the idle state.
-        if (this.stateDefinition.type === 'single' && this.state.motionIndex >= this.stateDefinition.motion.length)
+        if (!this.actions.size)
         {
-            // Clear the jump state first.
-            this.state.state = 'idle';
-            this.stateDefinition = this.character.definition.states['idle'];
-            return this.idle();
+            // Clear the timer and return.
+            clearInterval(this.actionTimer);
+            this.actionTimer = null;
+
+            // Set the state to idle as well.
+            this.state.state = event.properties['state.state'] = 'idle';
+        }
+        // Otherwise traverse the actions in order and apply them.
+        else for (let [key, value] of this.actions) this.action_apply(value, event)
+
+        // Broadcast the event.
+        this.broadcast(event);
+    }
+
+    action_apply(action, event)
+    {
+        // If reached the end of the jump then move to the idle state.
+        if (action.state.type === 'single' && action.motionIndex >= action.state.motion.length)
+        {
+            if (action.finished)
+            {
+                this.actions.delete(action.name);
+                return;
+            }
         }
 
         // Update the motion index and get the motion delta for it.
-        const motionDelta = this.stateDefinition.motion[ this.state.motionIndex++ % this.stateDefinition.motion.length ];
+        const motionDelta = action.state.motion[ action.motionIndex++ % action.state.motion.length ];
         if (!motionDelta) return;
 
         // Update the position.
-        this.state.position.y += (this.state.direction.y * motionDelta.y);
-        this.state.position.x += (this.state.direction.x * motionDelta.x);
+        this.state.position.y += (action.direction.y * motionDelta.y);
+        this.state.position.x += (action.direction.x * motionDelta.x);
 
         // Trigger a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.motionIndex': this.state.motionIndex, 'state.position.x': this.state.position.x, 'state.position.y': this.state.position.y} });
+        if (event)
+        {
+            event.properties['state.state']      = action.type;
+            event.properties['state.motionIndex'] = action.motionIndex;
+            event.properties['state.position.x'] = this.state.position.x;
+            event.properties['state.position.y'] = this.state.position.y;
+        }
     }
 
     /**
@@ -247,6 +210,7 @@ class CharacterInstance
      */
     broadcast(message)
     {
+        // If the user is in a session then broadcast to that session.
         if (this.user.session) this.user.session.send(message);
     }
 }
