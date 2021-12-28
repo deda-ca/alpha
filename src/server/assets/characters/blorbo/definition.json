@@ -9,15 +9,15 @@
             "assets": "idle.gif"
         },
         "walking": {
-            "motion": [{"x": 5, "y": 0}],
+            "motion": [{"x": 10, "y": 10}],
             "assets": "walking.gif"
         },
         "jumping": {
-            "motion": [{"x": 3, "y": 10}, {"x": 3, "y": 10}, {"x": 3, "y": 5}, {"x": 3, "y": 0}, {"x": 3, "y": -5}, {"x": 3, "y": -10}, {"x": 3, "y": -10}],
+            "motion": [{"x": 5, "y": 15}, {"x": 5, "y": 15}, {"x": 5, "y": 5}, {"x": 5, "y": 0}, {"x": 5, "y": -5}, {"x": 5, "y": -15}, {"x": 5, "y": -15}],
             "assets": "jumping.gif"
         },
         "running": {
-            "motion": [{"x": 10, "y": 0}],
+            "motion": [{"x": 20, "y": 20}],
             "assets": "walking.gif"
         },
         "crouching": {

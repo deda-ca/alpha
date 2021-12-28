@@ -104,10 +104,10 @@ class CharacterInstance
         // Update the character based on the action then add a list of changes to the queue.
         switch(event.action)
         {
-        case 'up'   : this.state.keyPresses.up    = true; this.up(); break;
-        case 'down' : this.state.keyPresses.down  = true; this.down(); break;
-        case 'left' : this.state.keyPresses.left  = true; this.walk(-1); break;
-        case 'right': this.state.keyPresses.right = true; this.walk(+1); break;
+        case 'up'   : this.state.keyPresses.up    = true; this.walk(0, -1); break;
+        case 'down' : this.state.keyPresses.down  = true; this.walk(0, +1); break;
+        case 'left' : this.state.keyPresses.left  = true; this.walk(-1, 0); break;
+        case 'right': this.state.keyPresses.right = true; this.walk(+1, 0); break;
         case 'jump' : this.state.keyPresses.jump  = true; this.jump(); break;
         }
     }
@@ -146,26 +146,31 @@ class CharacterInstance
         if (this.motionTimer) clearInterval(this.motionTimer);
 
         // Check which key is pressed and act accordingly before going to idle.
-        if (this.state.direction.x === -1 && this.state.keyPresses.left) return this.walk(-1); 
-        else if (this.state.direction.x === +1 && this.state.keyPresses.right) return this.walk(+1);
-        else if (this.state.keyPresses.left) return this.walk(-1); 
-        else if (this.state.keyPresses.right) return this.walk(+1);
+        if (this.state.direction.x === -1 && this.state.keyPresses.left) return this.walk(-1), 0; 
+        else if (this.state.direction.x === +1 && this.state.keyPresses.right) return this.walk(+1, 0);
+        else if (this.state.direction.y === -1 && this.state.keyPresses.up) return this.walk(0, -1);
+        else if (this.state.direction.y === +1 && this.state.keyPresses.down) return this.walk(0, +1);
+        else if (this.state.keyPresses.left) return this.walk(-1, 0); 
+        else if (this.state.keyPresses.right) return this.walk(+1, 0);
+        else if (this.state.keyPresses.up) return this.walk(0, -1);
+        else if (this.state.keyPresses.down) return this.walk(0, +1);
 
         // Set the state to idle and clear any motions and reset the motion index.
         this.state.state = 'idle';
         this.state.motion = null;
         this.state.motionIndex = 0;
         this.state.direction.x = 0;
-
+        
         // Add a state update to the session.
         this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': this.state.direction.x} });
     }
 
     /**
      * Invoked when the user clicks on the walk keys to walk either left or right based on the direction.
-     * @param {integer} direction - +1 for left and -1 for right.
+     * @param {integer} xDirection - +1 for left and -1 for right, 0 to not move in this direction.
+     * @param {integer} yDirection - +1 for up and -1 for down, 0 to not move in this direction.
      */
-    walk(direction)
+    walk(xDirection = 0, yDirection = 0)
     {
         // If currently jumping then complete the jump first.
         if (this.state.state === 'jumping') return;
@@ -173,14 +178,18 @@ class CharacterInstance
         // If there is a motion timer then clear it.
         if (this.motionTimer) clearInterval(this.motionTimer);
 
-        // Set the state to idle and clear any motions and reset the motion index.
+        // Set the state to idle and clear any motions and reset the motion index. Update the X and Y directions as well.
         this.state.state = 'walking';
         this.state.motion = this.character.definition.states.walking.motion;
         this.state.motionIndex = 0;
-        this.state.direction.x = direction;
+        this.state.direction.x = xDirection;
+        this.state.direction.y = yDirection;
 
         // Add a state update to the session.
-        this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': this.state.direction.x} });
+        this.broadcast({type: 'update', id: this.user.id, properties: {'state.state': this.state.state, 'state.motionIndex': this.state.motionIndex, 'state.direction.x': xDirection, 'state.direction.y': yDirection} });
+
+        // Invoke the first walk to get started immediately
+        this.walk_tick();
 
         // Set the jump_next within the pulse/ticker.
         this.motionTimer = setInterval( ()=>this.walk_tick(), this.engine.options.tickInterval);
@@ -201,9 +210,6 @@ class CharacterInstance
         // Update the position.
         this.state.position.y += (this.state.direction.y * motionDelta.y);
         this.state.position.x += (this.state.direction.x * motionDelta.x);
-
-        if (isNaN(this.state.position.x))
-            console.log('its NAN');
 
         // Trigger a state update to the session.
         this.broadcast({type: 'update', id: this.user.id, properties: {'state.motionIndex': this.state.motionIndex, 'state.position.x': this.state.position.x, 'state.position.y': this.state.position.y} });
@@ -254,7 +260,7 @@ class CharacterInstance
         if (!motionDelta) return;
 
         // Update the position.
-        this.state.position.y += (this.state.direction.y * motionDelta.y);
+        this.state.position.y += (-1 * motionDelta.y);
         this.state.position.x += (this.state.direction.x * motionDelta.x);
 
         // Trigger a state update to the session.

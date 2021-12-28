@@ -214,8 +214,11 @@ console.log(keyCode);
             // Get the next frame and move to the next one.
             const image = state.assets[user.state.motionIndex++ % state.assets.length];
 
-            // Render it.
+            // If the user direction is backwards then flip the image.
             this.context.drawImage(image, user.state.position.x, user.state.position.y, character.size.width, character.size.height);
+
+            // Render the user name on top of the user.
+            this.context.fillText(user.name, user.state.position.x, user.state.position.y);
         }
     }
 
