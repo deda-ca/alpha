@@ -9,6 +9,7 @@ const express = require('express');
 const User = require('./User.js');
 const Session = require('./Session.js');
 const WSServer = require('./WebSocketServer.js');
+const MapDefinition = require('./MapDefinition.js');
 const CharacterDefinition = require('./CharacterDefinition.js');
 
 /**
@@ -64,6 +65,11 @@ class Engine
         this.characters = this.loadCharacters();
 
         /**
+         * 
+         */
+        this.maps = this.loadMaps();
+
+        /**
          * ID generator.
          * @member {integer}
          */
@@ -76,7 +82,7 @@ class Engine
         this.httpServer.listen(this.options.port, ()=>console.log(`listening at http://localhost:${this.options.port}`) );
 
         // Start the global session.
-        this.lobbySession = this.createSession();
+        this.lobbySession = this.createSession('lobby', 'map-1');
     }
 
     /**
@@ -113,6 +119,31 @@ class Engine
         }
 
         return characters;
+    }
+
+    /**
+     * Loads all the maps from the file system into memory to used when requested.
+     */
+    loadMaps()
+    {
+        // A list of all loaded characters and their assets.
+        const maps = new Map();
+
+        // Load the characters JSON file the lists all the valid characters to use.
+        const jsonMaps = fs.readFileSync(path.join(__dirname, "/assets/maps/maps.json"), "UTF8");
+        const mapNames = JSON.parse(jsonMaps);
+
+        // Loop though the characters and load them.
+        for (let name of mapNames)
+        {
+            // Create a new character class the will automatically load itself.
+            const map = new MapDefinition( path.join(__dirname, "/assets/maps/", name), name );
+
+            // Add the character to the map.
+            maps.set(name, map);
+        }
+
+        return maps;
     }
 
 
@@ -160,9 +191,14 @@ class Engine
      * @param {string} name - The name of the session to add.
      * @returns {DEDA.AllGames.Core.Session} - Returns the newly created session.
      */
-    createSession(name)
+    createSession(name, mapName)
     {
-        const session = new Session(this);
+        // Find the map with the given name.
+        const mapDefinition = this.maps.get(mapName);
+
+        // @todo: If not found then log error.
+
+        const session = new Session(this, mapDefinition);
         this.sessions.set(session.id, session);
         return session;
     }

@@ -1,3 +1,4 @@
+
 /**
  * The game engine to renders the current state of the server.
  * 
@@ -20,6 +21,11 @@ class Engine
         this.connection = new Connection(this);
 
         this.canvas = document.getElementById('canvas');
+        this.canvas.addEventListener('mousemove', event=>{
+            // map the mouse to the client.
+            const position = this.mapMouse(event);
+            console.log(position);
+        });
 
         this.context = canvas.getContext('2d');
 
@@ -28,6 +34,8 @@ class Engine
         this.characters = [];
 
         this.session = {};
+
+        this.map = {};
 
         this.userId = null;
         
@@ -75,6 +83,15 @@ class Engine
         this.connection.send({"type": "setCharacter", "name": name});
     }
 
+    mapMouse(event)
+    {
+        const target = event.target;
+
+        return {x: (target.width * (event.offsetX/target.clientWidth) ), y: (target.height * (event.offsetY/target.clientHeight) )};
+
+        //console.log(`x="${event.offsetX}", y="${event.offsetY}"`);
+    }
+
     /**
      * 
      * @param {*} event 
@@ -88,7 +105,7 @@ class Engine
         if (event.type === 'session')
         {
             // Populate the session with the character details.
-            this.session = this.loadSession(event);
+            this.session = await this.loadSession(event);
 
             // Find the user state within the session.
             this.session.user = this.session.users.find( user=>(user.id === this.userId) );
@@ -132,14 +149,30 @@ class Engine
     /**
      * Loads the character details within the users.
      */
-    loadSession(session)
+    async loadSession(session)
     {
         // Traverse the users and find their corresponding character definitions.
         for (let user of session.users)
             user.characterDefinition = this.characters.find( character=>(character.name === user.state.name) );
 
+        // Set the map content locally.
+        this.map = await this.initMap(session.map);
+
         // Return the populated session.
         return session;
+    }
+
+    async initMap(map)
+    {
+        map.background = await this.loadImage(map.background);
+
+        for  (let name in map.assets)
+        {
+            const asset = map.assets[name];
+            if (asset.src) asset.src = await this.loadImage(asset.src);
+        }
+
+        return map;
     }
 
     /**
@@ -163,6 +196,7 @@ class Engine
         }
     }
 
+
     loadImage(dataURL)
     {
         return new Promise( resolve=>{
@@ -185,6 +219,32 @@ class Engine
     }
 
 
+    renderMap()
+    {
+        // Render the background first.
+        this.context.drawImage(this.map.background, 0, 0, this.map.size.width, this.map.size.height);
+
+        // Render the layout
+        for (let object of this.map.layout)
+        {
+            if (object.type === 'FLOOR')
+            {
+                this.context.stroke = "1px";
+                this.context.strokeStyle = "red";
+                this.context.strokeRect(object.x1, object.y1, object.x2 - object.x1, object.y2 - object.y1);
+                continue;
+            }
+
+            // Find the object reference within he assets.
+            const asset = this.map.assets[object.type];
+            if (!asset) continue;
+
+            this.context.drawImage(asset.src, object.x, object.y - asset.src.height);
+        }
+
+    }
+
+
     /**
      * Refreshes the render of the canvas to the current state.
      */
@@ -195,6 +255,8 @@ class Engine
 
         // If there is no session then don't render anything.
         if (!this.session || !this.session.users) return;
+
+        this.renderMap();
 
         // Render the users in the session.
         for (let user of this.session.users)

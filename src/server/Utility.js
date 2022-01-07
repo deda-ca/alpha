@@ -39,7 +39,7 @@ class Utility
     static getImageDataURL(fullPath)
     {
         // Get the file extension.
-        const type = path.extname(fullPath);
+        const type = path.extname(fullPath).substring(1);
 
         // Get the file content within a buffer.
         const buffer = fs.readFileSync(fullPath);

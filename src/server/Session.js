@@ -1,3 +1,5 @@
+const MapInstance = require('./MapInstance.js');
+
 /**
  * The session represents an instance of a map, lobby, donjon, etc. and all the users that are current 
  * within this session.
@@ -13,7 +15,7 @@ class Session
      * 
      * @param {DEDA.AllGames.Core.Engine} engine - Reference to the game engine.
      */
-    constructor(engine)
+    constructor(engine, map)
     {
         /**
          * Reference to the game engine.
@@ -26,6 +28,13 @@ class Session
          * @member {DEDA.AllGames.Core.User[]}
          */
         this.users = new Set();
+
+
+        /**
+         * A reference tot the session map instance that contains all the objects, assets, etc. specifically for this session and it's users.
+         * @member {DEDA.AllGames.Core.MapInstance}
+         */
+        this.map = new MapInstance(engine, map);
 
         /**
          * A list of all actions to send to the users within this session on the next tick.
@@ -92,7 +101,8 @@ class Session
         // @todo: add the session/map details as well.
         const state = {
             type: 'session',
-            users: []
+            users: [], 
+            map: this.map.definition.definition
         };
 
         // Traverse the users and serialize their state.

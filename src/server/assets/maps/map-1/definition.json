@@ -1,0 +1,36 @@
+{
+    "displayName": "Map-1",
+    "size":
+    {
+        "width": 1024,
+        "height": 1024
+    },
+    "thumbnail": "Thumbnail.jpg",
+    "background": "Background.png",
+
+    "assets": {
+        "Mushroom_1":
+            {
+                "src": "design/png/Object/Mushroom_1.png"
+            }
+    },
+
+    "layout": [
+        {
+            "type": "Mushroom_1",
+            "x": 100,
+            "y": 100
+        },
+
+        {
+            "type": "Mushroom_1",
+            "x": 130,
+            "y": 200
+        },
+
+        {
+            "type": "FLOOR",
+            "x1": 0, "y1": 850, "x2": 262 , "y2": 867
+        }
+    ]
+}
